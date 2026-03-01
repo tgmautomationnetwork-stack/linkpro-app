@@ -4,7 +4,7 @@ import { MTNMoMoService } from '@/lib/services/payments/mtn-momo.service';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
 
     // Verify authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
