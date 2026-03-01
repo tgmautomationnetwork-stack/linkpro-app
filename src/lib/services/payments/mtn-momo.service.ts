@@ -75,7 +75,7 @@ export class MTNMoMoService {
       // Token expires in 3600s, refresh 5min before
       this.tokenExpiry = Date.now() + (3600 - 300) * 1000;
 
-      return this.accessToken;
+      return this.accessToken!;
     } catch (error) {
       console.error('MTN MoMo token error:', error);
       throw new Error('Failed to get access token');
