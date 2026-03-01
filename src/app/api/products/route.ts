@@ -1,143 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { PLAN_LIMITS } from '@/types';
 
-// GET /api/products - List vendor's products
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = createServerSupabaseClient();
+type SubscriptionPlan = 'free' | 'pro' | 'business';
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Non authentifié' },
-        { status: 401 }
-      );
-    }
-
-    // Get vendor
-    const { data: vendor } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('id', user.user_metadata.vendor_id)
-      .single();
-
-    if (!vendor) {
-      return NextResponse.json(
-        { success: false, error: 'Vendeur non trouvé' },
-        { status: 404 }
-      );
-    }
-
-    // Get query params
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
-    const category = searchParams.get('category');
-    const available = searchParams.get('available');
-
-    // Build query
-    let query = supabase
-      .from('products')
-      .select('*', { count: 'exact' })
-      .eq('vendor_id', vendor.id)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: false });
-
-    if (category) {
-      query = query.eq('category', category);
-    }
-
-    if (available !== null) {
-      query = query.eq('is_available', available === 'true');
-    }
-
-    // Pagination
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
-    query = query.range(from, to);
-
-    const { data: products, error, count } = await query;
-
-    if (error) {
-      console.error('Products fetch error:', error);
-      return NextResponse.json(
-        { success: false, error: 'Erreur lors du chargement des produits' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      products,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        total_pages: Math.ceil((count || 0) / limit),
-      },
-    });
-
-  } catch (error) {
-    console.error('Products API error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Erreur serveur' },
-      { status: 500 }
-    );
-  }
+interface PlanLimits {
+  max_products: number | null;
 }
 
-// POST /api/products - Create new product
+const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
+  free: { max_products: 10 },
+  pro: { max_products: null },
+  business: { max_products: null },
+};
+
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient();
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Non authentifié' },
-        { status: 401 }
-      );
-    }
-
-    // Get vendor
-    const { data: vendor } = await supabase
-      .from('vendors')
-      .select('*')
-      .eq('id', user.user_metadata.vendor_id)
-      .single();
-
-    if (!vendor) {
-      return NextResponse.json(
-        { success: false, error: 'Vendeur non trouvé' },
-        { status: 404 }
-      );
-    }
-
     const body = await request.json();
-    const { name, price, description, image_url, category, tags, is_available, stock_quantity } = body;
+    const {
+      name,
+      price,
+      category,
+      description,
+      image_url,
+      is_available = true,
+    } = body;
 
     // Validation
     if (!name || !price || !image_url) {
       return NextResponse.json(
-        { success: false, error: 'Nom, prix et image requis' },
+        { success: false, error: 'Name, price, and image are required' },
         { status: 400 }
       );
     }
 
-    if (price < 100) {
+    if (price < 0) {
       return NextResponse.json(
-        { success: false, error: 'Prix minimum : 100 FCFA' },
+        { success: false, error: 'Price must be positive' },
         { status: 400 }
+      );
+    }
+
+    const supabase = createServerSupabaseClient();
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Non authentifié' },
+        { status: 401 }
+      );
+    }
+
+    // Get vendor
+    const { data: vendor, error: vendorError } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('id', user.user_metadata.vendor_id)
+      .single();
+
+    if (vendorError || !vendor) {
+      return NextResponse.json(
+        { success: false, error: 'Vendor not found' },
+        { status: 404 }
       );
     }
 
     // Check plan limits
-    const planLimits = PLAN_LIMITS[(vendor.subscription_plan || 'free') as SubscriptionPlan];
+    const plan = (vendor.subscription_plan || 'free') as SubscriptionPlan;
+    const planLimits = PLAN_LIMITS[plan];
     
     if (planLimits.max_products !== null) {
       const { count } = await supabase
@@ -147,33 +78,26 @@ export async function POST(request: NextRequest) {
 
       if (count && count >= planLimits.max_products) {
         return NextResponse.json(
-          { 
-            success: false, 
-            error: `Limite atteinte (${planLimits.max_products} produits max). Passez à PRO pour débloquer l'illimité.`,
-            upgrade_required: true,
+          {
+            success: false,
+            error: `Plan ${vendor.subscription_plan} limited to ${planLimits.max_products} products`,
           },
-          { status: 402 }
+          { status: 403 }
         );
       }
     }
-
-    // Generate slug
-    const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
 
     // Create product
     const { data: product, error: createError } = await supabase
       .from('products')
       .insert({
         vendor_id: vendor.id,
-        name: name.trim(),
-        slug,
+        name,
         price,
-        description: description?.trim() || null,
+        category,
+        description,
         image_url,
-        category: category || null,
-        tags: tags || [],
-        is_available: is_available !== false,
-        stock_quantity: stock_quantity || null,
+        is_available,
       })
       .select()
       .single();
@@ -181,26 +105,69 @@ export async function POST(request: NextRequest) {
     if (createError) {
       console.error('Product creation error:', createError);
       return NextResponse.json(
-        { success: false, error: 'Erreur lors de la création du produit' },
+        { success: false, error: 'Failed to create product' },
         { status: 500 }
       );
     }
 
-    // Update vendor's updated_at
-    await supabase
-      .from('vendors')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', vendor.id);
-
-    return NextResponse.json({
-      success: true,
-      product,
-    }, { status: 201 });
-
+    return NextResponse.json({ success: true, product });
   } catch (error) {
     console.error('Create product error:', error);
     return NextResponse.json(
-      { success: false, error: 'Erreur serveur' },
+      { success: false, error: 'Server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = createServerSupabaseClient();
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: 'Non authentifié' },
+        { status: 401 }
+      );
+    }
+
+    // Get vendor
+    const { data: vendor, error: vendorError } = await supabase
+      .from('vendors')
+      .select('id')
+      .eq('id', user.user_metadata.vendor_id)
+      .single();
+
+    if (vendorError || !vendor) {
+      return NextResponse.json(
+        { success: false, error: 'Vendor not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get products
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('*')
+      .eq('vendor_id', vendor.id)
+      .order('created_at', { ascending: false });
+
+    if (productsError) {
+      console.error('Products fetch error:', productsError);
+      return NextResponse.json(
+        { success: false, error: 'Failed to fetch products' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, products: products || [] });
+  } catch (error) {
+    console.error('Get products error:', error);
+    return NextResponse.json(
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }
