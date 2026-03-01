@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check plan limits
-    const planLimits = PLAN_LIMITS[vendor.subscription_plan];
+    const planLimits = PLAN_LIMITS[vendor.subscription_plan || 'free'];
     
     if (planLimits.max_products !== null) {
       const { count } = await supabase
