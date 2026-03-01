@@ -4,8 +4,10 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 // GET /api/vendors/[username] - Get public vendor page data
 export async function GET(
   request: NextRequest,
-  { params }: { params: { username: string } }
+  context: { params: Promise<{ username: string }> }
 ) {
+  const params = await context.params;
+
   try {
     const supabase = createServerSupabaseClient();
     const username = params.username.toLowerCase();
