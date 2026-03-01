@@ -1,169 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
 
-// PATCH /api/products/[id] - Update product
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const params = await context.params;
+  
   try {
-    const supabase = createServerSupabaseClient();
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Non authentifié' },
-        { status: 401 }
-      );
-    }
-
-    const productId = params.id;
+    const { id } = params;
     const body = await request.json();
 
-    // Verify product ownership
-    const { data: product } = await supabase
+    const supabase = createServerSupabaseClient();
+
+    const { data, error } = await supabase
       .from('products')
-      .select('vendor_id')
-      .eq('id', productId)
+      .update(body)
+      .eq('id', id)
+      .select()
       .single();
 
-    if (!product) {
+    if (error) {
       return NextResponse.json(
-        { success: false, error: 'Produit non trouvé' },
-        { status: 404 }
-      );
-    }
-
-    if (product.vendor_id !== user.user_metadata.vendor_id) {
-      return NextResponse.json(
-        { success: false, error: 'Non autorisé' },
-        { status: 403 }
-      );
-    }
-
-    // Update allowed fields
-    const allowedFields = [
-      'name', 'price', 'description', 'image_url', 'additional_images',
-      'is_available', 'stock_quantity', 'category', 'tags', 'sort_order'
-    ];
-
-    const updateData: any = {};
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
-
-    // Validate price if being updated
-    if (updateData.price !== undefined && updateData.price < 100) {
-      return NextResponse.json(
-        { success: false, error: 'Prix minimum : 100 FCFA' },
+        { success: false, error: error.message },
         { status: 400 }
       );
     }
 
-    updateData.updated_at = new Date().toISOString();
-
-    // Update product
-    const { data: updatedProduct, error: updateError } = await supabase
-      .from('products')
-      .update(updateData)
-      .eq('id', productId)
-      .select()
-      .single();
-
-    if (updateError) {
-      console.error('Product update error:', updateError);
-      return NextResponse.json(
-        { success: false, error: 'Erreur lors de la mise à jour' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      product: updatedProduct,
-    });
-
+    return NextResponse.json({ success: true, product: data });
   } catch (error) {
-    console.error('Update product error:', error);
     return NextResponse.json(
-      { success: false, error: 'Erreur serveur' },
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }
 }
 
-// DELETE /api/products/[id] - Delete product
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const params = await context.params;
+  
   try {
+    const { id } = params;
+
     const supabase = createServerSupabaseClient();
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Non authentifié' },
-        { status: 401 }
-      );
-    }
-
-    const productId = params.id;
-
-    // Verify product ownership
-    const { data: product } = await supabase
-      .from('products')
-      .select('vendor_id, image_url')
-      .eq('id', productId)
-      .single();
-
-    if (!product) {
-      return NextResponse.json(
-        { success: false, error: 'Produit non trouvé' },
-        { status: 404 }
-      );
-    }
-
-    if (product.vendor_id !== user.user_metadata.vendor_id) {
-      return NextResponse.json(
-        { success: false, error: 'Non autorisé' },
-        { status: 403 }
-      );
-    }
-
-    // Delete product
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from('products')
       .delete()
-      .eq('id', productId);
+      .eq('id', id);
 
-    if (deleteError) {
-      console.error('Product delete error:', deleteError);
+    if (error) {
       return NextResponse.json(
-        { success: false, error: 'Erreur lors de la suppression' },
-        { status: 500 }
+        { success: false, error: error.message },
+        { status: 400 }
       );
     }
 
-    // TODO: Delete image from Cloudinary
-    // await deleteCloudinaryImage(product.image_url);
-
-    return NextResponse.json({
-      success: true,
-      message: 'Produit supprimé',
-    });
-
+    return NextResponse.json({ success: true, message: 'Product deleted' });
   } catch (error) {
-    console.error('Delete product error:', error);
     return NextResponse.json(
-      { success: false, error: 'Erreur serveur' },
+      { success: false, error: 'Server error' },
       { status: 500 }
     );
   }
