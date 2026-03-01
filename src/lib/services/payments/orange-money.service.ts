@@ -46,7 +46,7 @@ export class OrangeMoneyService {
    */
   private static async getAccessToken(): Promise<string> {
     if (this.accessToken && Date.now() < this.tokenExpiry) {
-      return this.accessToken;
+      return this.accessToken!;
     }
 
     try {
@@ -73,7 +73,7 @@ export class OrangeMoneyService {
       this.accessToken = data.access_token;
       this.tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
 
-      return this.accessToken;
+      return this.accessToken!;
     } catch (error) {
       console.error('Orange Money token error:', error);
       throw new Error('Failed to get access token');
