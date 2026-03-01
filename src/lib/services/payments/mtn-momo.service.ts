@@ -48,7 +48,7 @@ export class MTNMoMoService {
   private static async getAccessToken(): Promise<string> {
     // Return cached token if valid
     if (this.accessToken && Date.now() < this.tokenExpiry) {
-      return this.accessToken;
+      return this.accessToken!;
     }
 
     try {
