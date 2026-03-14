@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { AnalyticsService } from '@/lib/services/analytics.service';
-import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AnalyticsChartSkeleton, StatsCardsSkeleton } from '@/components/ui/skeleton';
 
 type Period = '7d' | '30d' | '90d' | 'all';
 
@@ -36,8 +37,14 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-neutral-400 animate-spin" />
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div>
+          <h1 className="font-display text-[28px] text-neutral-900">Analytics</h1>
+          <p className="text-[14px] text-neutral-600 mt-1">Track your performance</p>
+        </div>
+        <StatsCardsSkeleton />
+        <AnalyticsChartSkeleton />
+        <AnalyticsChartSkeleton />
       </div>
     );
   }

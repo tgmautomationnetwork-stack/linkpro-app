@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Eye, EyeOff, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, EyeOff, Edit, Trash2 } from 'lucide-react';
 import { ProductsService, Product } from '@/lib/services/products.service';
 import { formatPrice } from '@/lib/utils';
 import { AddProductModal } from '@/components/products/AddProductModal';
 import { EditProductModal } from '@/components/products/EditProductModal';
+import { ProductTableSkeleton, StatsCardsSkeleton } from '@/components/ui/skeleton';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -111,26 +112,28 @@ export default function ProductsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="p-4 rounded-lg bg-white border border-neutral-200">
-          <p className="text-[13px] text-neutral-600 mb-1">Total</p>
-          <p className="text-[24px] font-display text-neutral-900">{products.length}</p>
+      {loading ? (
+        <StatsCardsSkeleton />
+      ) : (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="p-4 rounded-lg bg-white border border-neutral-200">
+            <p className="text-[13px] text-neutral-600 mb-1">Total</p>
+            <p className="text-[24px] font-display text-neutral-900">{products.length}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-white border border-neutral-200">
+            <p className="text-[13px] text-neutral-600 mb-1">Available</p>
+            <p className="text-[24px] font-display text-emerald-600">{products.filter(p => p.is_available).length}</p>
+          </div>
+          <div className="p-4 rounded-lg bg-white border border-neutral-200">
+            <p className="text-[13px] text-neutral-600 mb-1">Unavailable</p>
+            <p className="text-[24px] font-display text-neutral-400">{products.filter(p => !p.is_available).length}</p>
+          </div>
         </div>
-        <div className="p-4 rounded-lg bg-white border border-neutral-200">
-          <p className="text-[13px] text-neutral-600 mb-1">Available</p>
-          <p className="text-[24px] font-display text-emerald-600">{products.filter(p => p.is_available).length}</p>
-        </div>
-        <div className="p-4 rounded-lg bg-white border border-neutral-200">
-          <p className="text-[13px] text-neutral-600 mb-1">Unavailable</p>
-          <p className="text-[24px] font-display text-neutral-400">{products.filter(p => !p.is_available).length}</p>
-        </div>
-      </div>
+      )}
 
       {/* Products List */}
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="w-6 h-6 text-neutral-400 animate-spin" />
-        </div>
+        <ProductTableSkeleton />
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-neutral-100 flex items-center justify-center">
