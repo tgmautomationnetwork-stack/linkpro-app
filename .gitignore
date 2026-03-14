@@ -1,4 +1,5 @@
 
+
 node_modules
 .next
 .env.local
@@ -7,7 +8,3 @@ node_modules
 .vercel
 *.tsbuildinfo
 next-env.d.ts
--e 
-# Environment files
-*.env
-*.env.*
